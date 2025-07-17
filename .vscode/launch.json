@@ -1,0 +1,28 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "flutter_fake_loading (example)",
+      "cwd": "example",
+      "request": "launch",
+      "type": "dart",
+      "program": "main.dart",
+    },
+    {
+      "name": "flutter_fake_loading (example) (profile mode)",
+      "cwd": "example",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "profile",
+      "program": "main.dart",
+    },
+    {
+      "name": "flutter_fake_loading (example) (release mode)",
+      "cwd": "example",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "release",
+      "program": "main.dart",
+    }
+  ]
+}
