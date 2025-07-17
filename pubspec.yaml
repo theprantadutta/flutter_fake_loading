@@ -1,7 +1,9 @@
 name: flutter_fake_loading
-description: "A new Flutter package project."
+description: "A Flutter package that provides customizable fake loading screens with personality. Because loading shouldn't be boring!"
 version: 0.0.1
-homepage:
+homepage: https://github.com/theprantadutta/flutter_fake_loading
+repository: https://github.com/theprantadutta/flutter_fake_loading
+issue_tracker: https://github.com/theprantadutta/flutter_fake_loading/issues
 
 environment:
   sdk: ^3.8.1
