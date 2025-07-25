@@ -1,8 +1,11 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'fake_loader_controller.dart';
+import 'fake_progress_indicator.dart';
+import 'typewriter_text.dart';
 import 'models/fake_message.dart';
+import 'models/message_effect.dart';
+import 'utils/message_selector.dart';
 
 /// A widget that displays fake loading messages with customizable styling and behavior.
 class FakeLoader extends StatefulWidget {
@@ -36,6 +39,45 @@ class FakeLoader extends StatefulWidget {
   /// Whether to auto-start the loading sequence.
   final bool autoStart;
 
+  /// Whether to show a progress indicator.
+  final bool showProgress;
+
+  /// Duration for the progress animation to complete.
+  final Duration? progressDuration;
+
+  /// Color of the progress indicator.
+  final Color? progressColor;
+
+  /// Custom progress widget. If provided, this will be used instead of the default progress bar.
+  final Widget? progressWidget;
+
+  /// Default visual effect for messages.
+  final MessageEffect effect;
+
+  /// Delay between characters for typewriter effect.
+  final Duration typewriterDelay;
+
+  /// Whether to loop the message sequence until manually stopped.
+  final bool loopUntilComplete;
+
+  /// Maximum number of loops. If null, loops indefinitely when loopUntilComplete is true.
+  final int? maxLoops;
+
+  /// Callback when a loop completes.
+  final VoidCallback? onLoopComplete;
+
+  /// Text alignment for messages.
+  final TextAlign textAlign;
+
+  /// Padding around the content.
+  final EdgeInsets? contentPadding;
+
+  /// Spacing between spinner and text.
+  final double spacingBetweenSpinnerAndText;
+
+  /// Animation curve for transitions.
+  final Curve animationCurve;
+
   const FakeLoader({
     super.key,
     required this.messages,
@@ -48,7 +90,28 @@ class FakeLoader extends StatefulWidget {
     this.onComplete,
     this.onMessageChanged,
     this.autoStart = true,
-  }) : assert(messages.length > 0, 'Messages list cannot be empty');
+    this.showProgress = false,
+    this.progressDuration,
+    this.progressColor,
+    this.progressWidget,
+    this.effect = MessageEffect.fade,
+    this.typewriterDelay = const Duration(milliseconds: 50),
+    this.loopUntilComplete = false,
+    this.maxLoops,
+    this.onLoopComplete,
+    this.textAlign = TextAlign.center,
+    this.contentPadding,
+    this.spacingBetweenSpinnerAndText = 16.0,
+    this.animationCurve = Curves.easeInOut,
+  }) : assert(messages.length > 0, 'Messages list cannot be empty'),
+       assert(
+         maxLoops == null || maxLoops > 0,
+         'maxLoops must be greater than 0',
+       ),
+       assert(
+         spacingBetweenSpinnerAndText >= 0,
+         'spacingBetweenSpinnerAndText must be >= 0',
+       );
 
   @override
   State<FakeLoader> createState() => _FakeLoaderState();
@@ -61,6 +124,7 @@ class _FakeLoaderState extends State<FakeLoader> with TickerProviderStateMixin {
   Timer? _messageTimer;
   List<FakeMessage> _processedMessages = [];
   String _currentMessage = '';
+  GlobalKey? _progressKey;
 
   @override
   void initState() {
@@ -69,16 +133,31 @@ class _FakeLoaderState extends State<FakeLoader> with TickerProviderStateMixin {
     _controller = widget.controller ?? FakeLoaderController();
     _controller.addListener(_onControllerChanged);
 
+    // Configure looping behavior on the controller
+    _controller.configureLooping(
+      loopUntilComplete: widget.loopUntilComplete,
+      maxLoops: widget.maxLoops,
+      onLoopComplete: widget.onLoopComplete,
+    );
+
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+      CurvedAnimation(
+        parent: _animationController,
+        curve: widget.animationCurve,
+      ),
     );
 
     _processMessages();
+
+    // Initialize progress indicator if needed
+    if (widget.showProgress) {
+      _progressKey = GlobalKey();
+    }
 
     if (widget.autoStart) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -100,22 +179,36 @@ class _FakeLoaderState extends State<FakeLoader> with TickerProviderStateMixin {
       _controller = widget.controller ?? FakeLoaderController();
       _controller.addListener(_onControllerChanged);
     }
+
+    // Update loop configuration if changed
+    if (widget.loopUntilComplete != oldWidget.loopUntilComplete ||
+        widget.maxLoops != oldWidget.maxLoops ||
+        widget.onLoopComplete != oldWidget.onLoopComplete) {
+      _controller.configureLooping(
+        loopUntilComplete: widget.loopUntilComplete,
+        maxLoops: widget.maxLoops,
+        onLoopComplete: widget.onLoopComplete,
+      );
+    }
+
+    // Update animation curve if changed
+    if (widget.animationCurve != oldWidget.animationCurve) {
+      _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+        CurvedAnimation(
+          parent: _animationController,
+          curve: widget.animationCurve,
+        ),
+      );
+    }
   }
 
   void _processMessages() {
-    _processedMessages = widget.messages.map((message) {
-      if (message is String) {
-        return FakeMessage(message);
-      } else if (message is FakeMessage) {
-        return message;
-      } else {
-        return FakeMessage(message.toString());
-      }
-    }).toList();
-
-    if (widget.randomOrder) {
-      _processedMessages.shuffle(Random());
-    }
+    // Use MessageSelector for weighted selection
+    _processedMessages = MessageSelector.selectMessages(
+      widget.messages,
+      randomOrder: widget.randomOrder,
+      respectWeights: true,
+    );
 
     if (_processedMessages.isNotEmpty) {
       _currentMessage = _processedMessages[0].text;
@@ -124,6 +217,10 @@ class _FakeLoaderState extends State<FakeLoader> with TickerProviderStateMixin {
 
   void _onControllerChanged() {
     if (_controller.isRunning && !_controller.isCompleted) {
+      // Check if we've looped back to the beginning (for randomOrder support)
+      if (_controller.currentMessageIndex == 0 && widget.randomOrder) {
+        _processMessages();
+      }
       _startMessageSequence();
     } else if (_controller.isCompleted) {
       _onLoadingComplete();
@@ -143,6 +240,8 @@ class _FakeLoaderState extends State<FakeLoader> with TickerProviderStateMixin {
 
     _animationController.forward();
     _scheduleNextMessage();
+
+    // Progress indicator will auto-start when created
   }
 
   void _scheduleNextMessage() {
@@ -179,6 +278,73 @@ class _FakeLoaderState extends State<FakeLoader> with TickerProviderStateMixin {
     widget.onComplete?.call();
   }
 
+  Widget _buildMessageWidget() {
+    final currentFakeMessage =
+        _processedMessages.isNotEmpty &&
+            _controller.currentMessageIndex < _processedMessages.length
+        ? _processedMessages[_controller.currentMessageIndex]
+        : null;
+
+    final effectToUse = currentFakeMessage?.effect ?? widget.effect;
+
+    Widget messageWidget;
+
+    // Handle different message effects
+    switch (effectToUse) {
+      case MessageEffect.typewriter:
+        messageWidget = TypewriterText(
+          text: _currentMessage,
+          style: widget.textStyle ?? Theme.of(context).textTheme.bodyLarge,
+          characterDelay: widget.typewriterDelay,
+          textAlign: widget.textAlign,
+          autoStart: true,
+        );
+        break;
+      case MessageEffect.slide:
+        messageWidget = SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(1.0, 0.0),
+            end: Offset.zero,
+          ).animate(_fadeAnimation),
+          child: Text(
+            _currentMessage,
+            style: widget.textStyle ?? Theme.of(context).textTheme.bodyLarge,
+            textAlign: widget.textAlign,
+          ),
+        );
+        break;
+      case MessageEffect.scale:
+        messageWidget = ScaleTransition(
+          scale: _fadeAnimation,
+          child: Text(
+            _currentMessage,
+            style: widget.textStyle ?? Theme.of(context).textTheme.bodyLarge,
+            textAlign: widget.textAlign,
+          ),
+        );
+        break;
+      case MessageEffect.fade:
+        messageWidget = Text(
+          _currentMessage,
+          style: widget.textStyle ?? Theme.of(context).textTheme.bodyLarge,
+          textAlign: widget.textAlign,
+        );
+        break;
+    }
+
+    // Apply custom transition if provided
+    if (widget.transition != null) {
+      messageWidget = widget.transition!(messageWidget, _fadeAnimation);
+    } else if (effectToUse == MessageEffect.fade) {
+      messageWidget = FadeTransition(
+        opacity: _fadeAnimation,
+        child: messageWidget,
+      );
+    }
+
+    return messageWidget;
+  }
+
   @override
   void dispose() {
     _controller.removeListener(_onControllerChanged);
@@ -192,30 +358,43 @@ class _FakeLoaderState extends State<FakeLoader> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    Widget messageWidget = Text(
-      _currentMessage,
-      style: widget.textStyle ?? Theme.of(context).textTheme.bodyLarge,
-      textAlign: TextAlign.center,
-    );
+    final messageWidget = _buildMessageWidget();
 
-    if (widget.transition != null) {
-      messageWidget = widget.transition!(messageWidget, _fadeAnimation);
-    } else {
-      messageWidget = FadeTransition(
-        opacity: _fadeAnimation,
-        child: messageWidget,
-      );
-    }
-
-    return Column(
+    Widget content = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (widget.spinner != null) ...[
           widget.spinner!,
-          const SizedBox(height: 16),
+          SizedBox(height: widget.spacingBetweenSpinnerAndText),
         ],
         messageWidget,
+        if (widget.showProgress) ...[
+          const SizedBox(height: 16),
+          widget.progressWidget ??
+              FakeProgressIndicator(
+                key: _progressKey,
+                duration:
+                    widget.progressDuration ??
+                    Duration(
+                      milliseconds: (_processedMessages.fold<int>(
+                        0,
+                        (sum, msg) =>
+                            sum +
+                            (msg.duration?.inMilliseconds ??
+                                widget.messageDuration.inMilliseconds),
+                      )),
+                    ),
+                color: widget.progressColor,
+                autoStart: false,
+              ),
+        ],
       ],
     );
+
+    if (widget.contentPadding != null) {
+      content = Padding(padding: widget.contentPadding!, child: content);
+    }
+
+    return content;
   }
 }

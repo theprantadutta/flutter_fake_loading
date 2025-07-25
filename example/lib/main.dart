@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_fake_loading/flutter_fake_loading.dart';
+import 'showcase_app.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const ShowcaseApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -348,10 +349,12 @@ class _BasicDemoTabState extends State<BasicDemoTab> {
                         ],
                         selected: {_selectedMessageSet},
                         onSelectionChanged: (Set<int> selection) {
-                          setState(() {
-                            _selectedMessageSet = selection.first;
+                          if (mounted) {
+                            setState(() {
+                              _selectedMessageSet = selection.first;
+                            });
                             _controller.reset();
-                          });
+                          }
                         },
                       ),
 
@@ -365,10 +368,12 @@ class _BasicDemoTabState extends State<BasicDemoTab> {
                         ),
                         value: _randomOrder,
                         onChanged: (value) {
-                          setState(() {
-                            _randomOrder = value;
+                          if (mounted) {
+                            setState(() {
+                              _randomOrder = value;
+                            });
                             _controller.reset();
-                          });
+                          }
                         },
                       ),
 
@@ -382,26 +387,34 @@ class _BasicDemoTabState extends State<BasicDemoTab> {
                           ElevatedButton.icon(
                             onPressed: _controller.isRunning
                                 ? null
-                                : () => _controller.start(),
+                                : () {
+                                    if (mounted) _controller.start();
+                                  },
                             icon: const Icon(Icons.play_arrow),
                             label: const Text('Start'),
                           ),
                           ElevatedButton.icon(
                             onPressed: _controller.isRunning
-                                ? () => _controller.stop()
+                                ? () {
+                                    if (mounted) _controller.stop();
+                                  }
                                 : null,
                             icon: const Icon(Icons.pause),
                             label: const Text('Stop'),
                           ),
                           ElevatedButton.icon(
                             onPressed: _controller.isRunning
-                                ? () => _controller.skip()
+                                ? () {
+                                    if (mounted) _controller.skip();
+                                  }
                                 : null,
                             icon: const Icon(Icons.skip_next),
                             label: const Text('Skip'),
                           ),
                           ElevatedButton.icon(
-                            onPressed: () => _controller.reset(),
+                            onPressed: () {
+                              if (mounted) _controller.reset();
+                            },
                             icon: const Icon(Icons.refresh),
                             label: const Text('Reset'),
                           ),
@@ -444,12 +457,14 @@ class _BasicDemoTabState extends State<BasicDemoTab> {
                           ),
                           autoStart: false,
                           onComplete: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Loading completed! 🎉'),
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Loading completed! 🎉'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            }
                           },
                         ),
                       ),
@@ -541,10 +556,12 @@ class _OverlayDemoTabState extends State<OverlayDemoTab> {
         future: _simulateAsyncOperation(),
         messages: _messages,
         onComplete: (data) {
-          setState(() {
-            _showOverlay = false;
-            _lastResult = data;
-          });
+          if (mounted) {
+            setState(() {
+              _showOverlay = false;
+              _lastResult = data;
+            });
+          }
         },
         textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
         spinner: CircularProgressIndicator(
@@ -959,19 +976,25 @@ class _StylesTabState extends State<StylesTab> {
                           ElevatedButton.icon(
                             onPressed: _controller.isRunning
                                 ? null
-                                : () => _controller.start(),
+                                : () {
+                                    if (mounted) _controller.start();
+                                  },
                             icon: const Icon(Icons.play_arrow),
                             label: const Text('Start'),
                           ),
                           ElevatedButton.icon(
                             onPressed: _controller.isRunning
-                                ? () => _controller.stop()
+                                ? () {
+                                    if (mounted) _controller.stop();
+                                  }
                                 : null,
                             icon: const Icon(Icons.pause),
                             label: const Text('Stop'),
                           ),
                           ElevatedButton.icon(
-                            onPressed: () => _controller.reset(),
+                            onPressed: () {
+                              if (mounted) _controller.reset();
+                            },
                             icon: const Icon(Icons.refresh),
                             label: const Text('Reset'),
                           ),
